@@ -9,12 +9,16 @@ import numpy as np
 import torch.nn.functional as F
 from utils.pointconv_util import PointConvDensitySetAbstraction
 
+
 class PointConvDensityClsSsg(nn.Module):
-    def __init__(self, num_classes = 40):
+    def __init__(self, num_classes=40):
         super(PointConvDensityClsSsg, self).__init__()
-        self.sa1 = PointConvDensitySetAbstraction(npoint=512, nsample=32, in_channel=3, mlp=[64, 64, 128], bandwidth = 0.1, group_all=False)
-        self.sa2 = PointConvDensitySetAbstraction(npoint=128, nsample=64, in_channel=128 + 3, mlp=[128, 128, 256], bandwidth = 0.2, group_all=False)
-        self.sa3 = PointConvDensitySetAbstraction(npoint=1, nsample=None, in_channel=256 + 3, mlp=[256, 512, 1024], bandwidth = 0.4, group_all=True)
+        self.sa1 = PointConvDensitySetAbstraction(npoint=512, nsample=32, in_channel=3, mlp=[64, 64, 128],
+                                                  bandwidth=0.1, group_all=False)
+        self.sa2 = PointConvDensitySetAbstraction(npoint=128, nsample=64, in_channel=128 + 3, mlp=[128, 128, 256],
+                                                  bandwidth=0.2, group_all=False)
+        self.sa3 = PointConvDensitySetAbstraction(npoint=1, nsample=None, in_channel=256 + 3, mlp=[256, 512, 1024],
+                                                  bandwidth=0.4, group_all=True)
         self.fc1 = nn.Linear(1024, 512)
         self.bn1 = nn.BatchNorm1d(512)
         self.drop1 = nn.Dropout(0.4)
@@ -35,13 +39,14 @@ class PointConvDensityClsSsg(nn.Module):
         x = F.log_softmax(x, -1)
         return x
 
+
 if __name__ == '__main__':
     import os
     import torch
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
-    input = torch.randn((8,3,2048))
-    label = torch.randn(8,16)
-    model = PointConvDensityClsSsg(num_classes=40)
-    output= model(input)
-    print(output.size())
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+    input = torch.randn((8, 3, 2048))
+    label = torch.randn(8, 16)
+    model = PointConvDensityClsSsg(num_classes=40)
+    output = model(input)
+    print(output.size())

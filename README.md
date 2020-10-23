@@ -20,6 +20,7 @@ Unlike images which are represented in regular dense grids, 3D point clouds are 
 ## Installation
 The code is modified from repo [Pointnet_Pointnet2_pytorch](https://github.com/yanx27/Pointnet_Pointnet2_pytorch). Please install [PyTorch](https://pytorch.org/), [pandas](https://pandas.pydata.org/), and [sklearn](https://scikit-learn.org/).
 The code has been tested with Python 3.5, pytorch 1.2, CUDA 10.0 and cuDNN 7.6 on Ubuntu 16.04.
+The code has also been tested with Python 3.8, pytorch 1.6, CUDA 10.2 and cuDNN 8.0 on Windows 10.
 
 ## Usage
 ### ModelNet40 Classification

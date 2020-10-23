@@ -1,7 +1,7 @@
 import argparse
 import os
 import sys
-import numpy as np 
+import numpy as np
 import torch
 import torch.nn.parallel
 import torch.utils.data
@@ -16,7 +16,7 @@ from model.pointconv import PointConvDensityClsSsg as PointConvClsSsg
 
 
 def parse_args():
-    '''PARAMETERS'''
+    """PARAMETERS"""
     parser = argparse.ArgumentParser('PointConv')
     parser.add_argument('--batchsize', type=int, default=16, help='batch size')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
@@ -25,15 +25,17 @@ def parse_args():
     parser.add_argument('--model_name', default='pointconv', help='model name')
     return parser.parse_args()
 
+
 def main(args):
-    '''HYPER PARAMETER'''
+    """HYPER PARAMETER"""
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     datapath = './data/ModelNet/'
 
     '''CREATE DIR'''
     experiment_dir = Path('./eval_experiment/')
     experiment_dir.mkdir(exist_ok=True)
-    file_dir = Path(str(experiment_dir) + '/%sModelNet40-'%args.model_name + str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')))
+    file_dir = Path(str(experiment_dir) + '/%sModelNet40-' % args.model_name + str(
+        datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')))
     file_dir.mkdir(exist_ok=True)
     checkpoints_dir = file_dir.joinpath('checkpoints/')
     checkpoints_dir.mkdir(exist_ok=True)
@@ -46,22 +48,22 @@ def main(args):
     logger = logging.getLogger(args.model_name)
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(str(log_dir) + 'eval_%s_cls.txt'%args.model_name)
+    file_handler = logging.FileHandler(str(log_dir) + 'eval_%s_cls.txt' % args.model_name)
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-    logger.info('---------------------------------------------------EVAL---------------------------------------------------')
+    logger.info(
+        '---------------------------------------------------EVAL---------------------------------------------------')
     logger.info('PARAMETER ...')
     logger.info(args)
 
     '''DATA LOADING'''
     logger.info('Load dataset ...')
     train_data, train_label, test_data, test_label = load_data(datapath, classification=True)
-    logger.info("The number of training data is: %d",train_data.shape[0])
+    logger.info("The number of training data is: %d", train_data.shape[0])
     logger.info("The number of test data is: %d", test_data.shape[0])
-    testDataset = ModelNetDataLoader(test_data, test_label)
-    testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batchsize, shuffle=False)
-    
+    test_dataset = ModelNetDataLoader(test_data, test_label)
+    test_data_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batchsize, shuffle=False)
 
     '''MODEL LOADING'''
     num_class = 40
@@ -74,8 +76,8 @@ def main(args):
         classifier.load_state_dict(checkpoint['model_state_dict'])
     else:
         print('Please load Checkpoint to eval...')
-        sys.exit(0)
         start_epoch = 0
+        sys.exit(0)
 
     blue = lambda x: '\033[94m' + x + '\033[0m'
 
@@ -85,16 +87,16 @@ def main(args):
 
     total_correct = 0
     total_seen = 0
-    for batch_id, data in tqdm(enumerate(testDataLoader, 0), total=len(testDataLoader), smoothing=0.9):
+    for batch_id, data in tqdm(enumerate(test_data_loader, 0), total=len(test_data_loader), smoothing=0.9):
         pointcloud, target = data
         target = target[:, 0]
-        #import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
         pred_view = torch.zeros(pointcloud.shape[0], num_class).cuda()
 
         for _ in range(args.num_view):
             pointcloud = generate_new_view(pointcloud)
-            #import ipdb; ipdb.set_trace()
-            #points = torch.from_numpy(pointcloud).permute(0, 2, 1)
+            # import ipdb; ipdb.set_trace()
+            # points = torch.from_numpy(pointcloud).permute(0, 2, 1)
             points = pointcloud.permute(0, 2, 1)
             points, target = points.cuda(), target.cuda()
             classifier = classifier.eval()
@@ -107,10 +109,11 @@ def main(args):
         total_seen += float(points.size()[0])
 
     accuracy = total_correct / total_seen
-    print('Total Accuracy: %f'%accuracy)
+    print('Total Accuracy: %f' % accuracy)
 
-    logger.info('Total Accuracy: %f'%accuracy)
+    logger.info('Total Accuracy: %f' % accuracy)
     logger.info('End of evaluation...')
+
 
 def generate_new_view(points):
     points_idx = np.arange(points.shape[1])
@@ -135,6 +138,7 @@ def rotate_point_cloud_by_angle(data, rotation_angle):
     rotated_data = np.dot(data, rotation_matrix)
 
     return rotated_data
+
 
 if __name__ == '__main__':
     args = parse_args()

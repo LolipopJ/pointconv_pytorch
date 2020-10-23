@@ -11,9 +11,11 @@ from time import time
 import numpy as np
 from sklearn.neighbors.kde import KernelDensity
 
+
 def timeit(tag, t):
     print("{}: {}s".format(tag, time() - t))
     return time()
+
 
 def square_distance(src, dst):
     """
@@ -38,6 +40,7 @@ def square_distance(src, dst):
     dist += torch.sum(dst ** 2, -1).view(B, 1, M)
     return dist
 
+
 def index_points(points, idx):
     """
 
@@ -57,6 +60,7 @@ def index_points(points, idx):
     new_points = points[batch_indices, idx, :]
     return new_points
 
+
 def farthest_point_sample(xyz, npoint):
     """
     Input:
@@ -65,7 +69,7 @@ def farthest_point_sample(xyz, npoint):
     Return:
         centroids: sampled pointcloud index, [B, npoint]
     """
-    #import ipdb; ipdb.set_trace()
+    # import ipdb; ipdb.set_trace()
     device = xyz.device
     B, N, C = xyz.shape
     centroids = torch.zeros(B, npoint, dtype=torch.long).to(device)
@@ -80,6 +84,7 @@ def farthest_point_sample(xyz, npoint):
         distance[mask] = dist[mask]
         farthest = torch.max(distance, -1)[1]
     return centroids
+
 
 def query_ball_point(radius, nsample, xyz, new_xyz):
     """
@@ -103,6 +108,7 @@ def query_ball_point(radius, nsample, xyz, new_xyz):
     group_idx[mask] = group_first[mask]
     return group_idx
 
+
 def knn_point(nsample, xyz, new_xyz):
     """
     Input:
@@ -113,10 +119,11 @@ def knn_point(nsample, xyz, new_xyz):
         group_idx: grouped points index, [B, S, nsample]
     """
     sqrdists = square_distance(new_xyz, xyz)
-    _, group_idx = torch.topk(sqrdists, nsample, dim = -1, largest=False, sorted=False)
+    _, group_idx = torch.topk(sqrdists, nsample, dim=-1, largest=False, sorted=False)
     return group_idx
 
-def sample_and_group(npoint, nsample, xyz, points, density_scale = None):
+
+def sample_and_group(npoint, nsample, xyz, points, density_scale=None):
     """
     Input:
         npoint:
@@ -129,14 +136,14 @@ def sample_and_group(npoint, nsample, xyz, points, density_scale = None):
     """
     B, N, C = xyz.shape
     S = npoint
-    fps_idx = farthest_point_sample(xyz, npoint) # [B, npoint, C]
+    fps_idx = farthest_point_sample(xyz, npoint)  # [B, npoint, C]
     new_xyz = index_points(xyz, fps_idx)
     idx = knn_point(nsample, xyz, new_xyz)
-    grouped_xyz = index_points(xyz, idx) # [B, npoint, nsample, C]
+    grouped_xyz = index_points(xyz, idx)  # [B, npoint, nsample, C]
     grouped_xyz_norm = grouped_xyz - new_xyz.view(B, S, 1, C)
     if points is not None:
         grouped_points = index_points(points, idx)
-        new_points = torch.cat([grouped_xyz_norm, grouped_points], dim=-1) # [B, npoint, nsample, C+D]
+        new_points = torch.cat([grouped_xyz_norm, grouped_points], dim=-1)  # [B, npoint, nsample, C+D]
     else:
         new_points = grouped_xyz_norm
 
@@ -146,7 +153,8 @@ def sample_and_group(npoint, nsample, xyz, points, density_scale = None):
         grouped_density = index_points(density_scale, idx)
         return new_xyz, new_points, grouped_xyz_norm, idx, grouped_density
 
-def sample_and_group_all(xyz, points, density_scale = None):
+
+def sample_and_group_all(xyz, points, density_scale=None):
     """
     Input:
         xyz: input points position data, [B, N, C]
@@ -157,8 +165,8 @@ def sample_and_group_all(xyz, points, density_scale = None):
     """
     device = xyz.device
     B, N, C = xyz.shape
-    #new_xyz = torch.zeros(B, 1, C).to(device)
-    new_xyz = xyz.mean(dim = 1, keepdim = True)
+    # new_xyz = torch.zeros(B, 1, C).to(device)
+    new_xyz = xyz.mean(dim=1, keepdim=True)
     grouped_xyz = xyz.view(B, 1, N, C) - new_xyz.view(B, 1, 1, C)
     if points is not None:
         new_points = torch.cat([grouped_xyz, points.view(B, 1, N, -1)], dim=-1)
@@ -169,6 +177,7 @@ def sample_and_group_all(xyz, points, density_scale = None):
     else:
         grouped_density = density_scale.view(B, 1, N, 1)
         return new_xyz, new_points, grouped_xyz, grouped_density
+
 
 def group(nsample, xyz, points):
     """
@@ -185,33 +194,35 @@ def group(nsample, xyz, points):
     S = N
     new_xyz = xyz
     idx = knn_point(nsample, xyz, new_xyz)
-    grouped_xyz = index_points(xyz, idx) # [B, npoint, nsample, C]
+    grouped_xyz = index_points(xyz, idx)  # [B, npoint, nsample, C]
     grouped_xyz_norm = grouped_xyz - new_xyz.view(B, S, 1, C)
     if points is not None:
         grouped_points = index_points(points, idx)
-        new_points = torch.cat([grouped_xyz_norm, grouped_points], dim=-1) # [B, npoint, nsample, C+D]
+        new_points = torch.cat([grouped_xyz_norm, grouped_points], dim=-1)  # [B, npoint, nsample, C+D]
     else:
         new_points = grouped_xyz_norm
 
     return new_points, grouped_xyz_norm
 
+
 def compute_density(xyz, bandwidth):
-    '''
+    """
     xyz: input points position data, [B, N, C]
-    '''
-    #import ipdb; ipdb.set_trace()
+    """
+    # import ipdb; ipdb.set_trace()
     B, N, C = xyz.shape
     sqrdists = square_distance(xyz, xyz)
     gaussion_density = torch.exp(- sqrdists / (2.0 * bandwidth * bandwidth)) / (2.5 * bandwidth)
-    xyz_density = gaussion_density.mean(dim = -1)
+    xyz_density = gaussion_density.mean(dim=-1)
 
     return xyz_density
 
+
 class DensityNet(nn.Module):
-    def __init__(self, hidden_unit = [8, 8]):
+    def __init__(self, hidden_unit=[8, 8]):
         super(DensityNet, self).__init__()
         self.mlp_convs = nn.ModuleList()
-        self.mlp_bns = nn.ModuleList() 
+        self.mlp_bns = nn.ModuleList()
 
         self.mlp_convs.append(nn.Conv1d(1, hidden_unit[0], 1))
         self.mlp_bns.append(nn.BatchNorm1d(hidden_unit[0]))
@@ -222,21 +233,22 @@ class DensityNet(nn.Module):
         self.mlp_bns.append(nn.BatchNorm1d(1))
 
     def forward(self, xyz_density):
-        B, N = xyz_density.shape 
+        B, N = xyz_density.shape
         density_scale = xyz_density.unsqueeze(1)
         for i, conv in enumerate(self.mlp_convs):
             bn = self.mlp_bns[i]
-            density_scale =  bn(conv(density_scale))
+            density_scale = bn(conv(density_scale))
             if i == len(self.mlp_convs):
                 density_scale = F.sigmoid(density_scale) + 0.5
             else:
                 density_scale = F.relu(density_scale)
-        
+
         return density_scale
+
 
 class WeightNet(nn.Module):
 
-    def __init__(self, in_channel, out_channel, hidden_unit = [8, 8]):
+    def __init__(self, in_channel, out_channel, hidden_unit=[8, 8]):
         super(WeightNet, self).__init__()
 
         self.mlp_convs = nn.ModuleList()
@@ -252,16 +264,17 @@ class WeightNet(nn.Module):
                 self.mlp_bns.append(nn.BatchNorm2d(hidden_unit[i]))
             self.mlp_convs.append(nn.Conv2d(hidden_unit[-1], out_channel, 1))
             self.mlp_bns.append(nn.BatchNorm2d(out_channel))
-        
+
     def forward(self, localized_xyz):
-        #xyz : BxCxKxN
+        # xyz : BxCxKxN
 
         weights = localized_xyz
         for i, conv in enumerate(self.mlp_convs):
             bn = self.mlp_bns[i]
-            weights =  F.relu(bn(conv(weights)))
+            weights = F.relu(bn(conv(weights)))
 
         return weights
+
 
 class PointConvSetAbstraction(nn.Module):
     def __init__(self, npoint, nsample, in_channel, mlp, group_all):
@@ -301,20 +314,23 @@ class PointConvSetAbstraction(nn.Module):
             new_xyz, new_points, grouped_xyz_norm, _ = sample_and_group(self.npoint, self.nsample, xyz, points)
         # new_xyz: sampled points position data, [B, npoint, C]
         # new_points: sampled points data, [B, npoint, nsample, C+D]
-        new_points = new_points.permute(0, 3, 2, 1) # [B, C+D, nsample,npoint]
+        new_points = new_points.permute(0, 3, 2, 1)  # [B, C+D, nsample,npoint]
         for i, conv in enumerate(self.mlp_convs):
             bn = self.mlp_bns[i]
-            new_points =  F.relu(bn(conv(new_points)))
+            new_points = F.relu(bn(conv(new_points)))
 
         grouped_xyz = grouped_xyz_norm.permute(0, 3, 2, 1)
         weights = self.weightnet(grouped_xyz)
-        new_points = torch.matmul(input=new_points.permute(0, 3, 1, 2), other = weights.permute(0, 3, 2, 1)).view(B, self.npoint, -1)
+        new_points = torch.matmul(input=new_points.permute(0, 3, 1, 2), other=weights.permute(0, 3, 2, 1)).view(B,
+                                                                                                                self.npoint,
+                                                                                                                -1)
         new_points = self.linear(new_points)
         new_points = self.bn_linear(new_points.permute(0, 2, 1))
         new_points = F.relu(new_points)
         new_xyz = new_xyz.permute(0, 2, 1)
 
         return new_xyz, new_points
+
 
 class PointConvDensitySetAbstraction(nn.Module):
     def __init__(self, npoint, nsample, in_channel, mlp, bandwidth, group_all):
@@ -352,24 +368,29 @@ class PointConvDensitySetAbstraction(nn.Module):
             points = points.permute(0, 2, 1)
 
         xyz_density = compute_density(xyz, self.bandwidth)
-        #import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
         density_scale = self.densitynet(xyz_density)
 
         if self.group_all:
-            new_xyz, new_points, grouped_xyz_norm, grouped_density = sample_and_group_all(xyz, points, density_scale.view(B, N, 1))
+            new_xyz, new_points, grouped_xyz_norm, grouped_density = sample_and_group_all(xyz, points,
+                                                                                          density_scale.view(B, N, 1))
         else:
-            new_xyz, new_points, grouped_xyz_norm, _, grouped_density = sample_and_group(self.npoint, self.nsample, xyz, points, density_scale.view(B, N, 1))
+            new_xyz, new_points, grouped_xyz_norm, _, grouped_density = sample_and_group(self.npoint, self.nsample, xyz,
+                                                                                         points,
+                                                                                         density_scale.view(B, N, 1))
         # new_xyz: sampled points position data, [B, npoint, C]
         # new_points: sampled points data, [B, npoint, nsample, C+D]
-        new_points = new_points.permute(0, 3, 2, 1) # [B, C+D, nsample,npoint]
+        new_points = new_points.permute(0, 3, 2, 1)  # [B, C+D, nsample,npoint]
         for i, conv in enumerate(self.mlp_convs):
             bn = self.mlp_bns[i]
-            new_points =  F.relu(bn(conv(new_points)))
+            new_points = F.relu(bn(conv(new_points)))
 
         grouped_xyz = grouped_xyz_norm.permute(0, 3, 2, 1)
         weights = self.weightnet(grouped_xyz)
         new_points = new_points * grouped_density.permute(0, 3, 2, 1)
-        new_points = torch.matmul(input=new_points.permute(0, 3, 1, 2), other = weights.permute(0, 3, 2, 1)).view(B, self.npoint, -1)
+        new_points = torch.matmul(input=new_points.permute(0, 3, 1, 2), other=weights.permute(0, 3, 2, 1)).view(B,
+                                                                                                                self.npoint,
+                                                                                                                -1)
         new_points = self.linear(new_points)
         new_points = self.bn_linear(new_points.permute(0, 2, 1))
         new_points = F.relu(new_points)

@@ -14,28 +14,30 @@ from model.pointconv import PointConvDensityClsSsg as PointConvClsSsg
 
 
 def parse_args():
-    '''PARAMETERS'''
+    """PARAMETERS"""
     parser = argparse.ArgumentParser('PointConv')
     parser.add_argument('--batchsize', type=int, default=16, help='batch size in training')
-    parser.add_argument('--epoch',  default=400, type=int, help='number of epoch in training')
+    parser.add_argument('--epoch', default=400, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--train_metric', type=str, default=False, help='whether evaluate on training dataset')
     parser.add_argument('--optimizer', type=str, default='SGD', help='optimizer for training')
-    parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
+    parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='decay rate of learning rate')
     parser.add_argument('--model_name', default='pointconv', help='model name')
     return parser.parse_args()
 
+
 def main(args):
-    '''HYPER PARAMETER'''
+    """HYPER PARAMETER"""
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     datapath = './data/ModelNet/'
 
     '''CREATE DIR'''
     experiment_dir = Path('./experiment/')
     experiment_dir.mkdir(exist_ok=True)
-    file_dir = Path(str(experiment_dir) + '/%sModelNet40-'%args.model_name + str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')))
+    file_dir = Path(str(experiment_dir) + '/%sModelNet40-' % args.model_name + str(
+        datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')))
     file_dir.mkdir(exist_ok=True)
     checkpoints_dir = file_dir.joinpath('checkpoints/')
     checkpoints_dir.mkdir(exist_ok=True)
@@ -47,23 +49,24 @@ def main(args):
     logger = logging.getLogger(args.model_name)
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(str(log_dir) + 'train_%s_cls.txt'%args.model_name)
+    file_handler = logging.FileHandler(str(log_dir) + 'train_%s_cls.txt' % args.model_name)
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-    logger.info('---------------------------------------------------TRANING---------------------------------------------------')
+    logger.info('---------------------------------------------------TRAINING'
+                '---------------------------------------------------')
     logger.info('PARAMETER ...')
     logger.info(args)
 
     '''DATA LOADING'''
     logger.info('Load dataset ...')
     train_data, train_label, test_data, test_label = load_data(datapath, classification=True)
-    logger.info("The number of training data is: %d",train_data.shape[0])
+    logger.info("The number of training data is: %d", train_data.shape[0])
     logger.info("The number of test data is: %d", test_data.shape[0])
-    trainDataset = ModelNetDataLoader(train_data, train_label)
-    testDataset = ModelNetDataLoader(test_data, test_label)
-    trainDataLoader = torch.utils.data.DataLoader(trainDataset, batch_size=args.batchsize, shuffle=True)
-    testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batchsize, shuffle=False)
+    train_dataset = ModelNetDataLoader(train_data, train_label)
+    test_dataset = ModelNetDataLoader(test_data, test_label)
+    train_data_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batchsize, shuffle=True)
+    test_data_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batchsize, shuffle=False)
 
     '''MODEL LOADING'''
     num_class = 40
@@ -77,7 +80,6 @@ def main(args):
     else:
         print('No existing model, starting training from scratch...')
         start_epoch = 0
-
 
     if args.optimizer == 'SGD':
         optimizer = torch.optim.SGD(classifier.parameters(), lr=0.01, momentum=0.9)
@@ -95,14 +97,14 @@ def main(args):
     best_tst_accuracy = 0.0
     blue = lambda x: '\033[94m' + x + '\033[0m'
 
-    '''TRANING'''
+    '''TRAINING'''
     logger.info('Start training...')
-    for epoch in range(start_epoch,args.epoch):
+    for epoch in range(start_epoch, args.epoch):
         print('Epoch %d (%d/%s):' % (global_epoch + 1, epoch + 1, args.epoch))
-        logger.info('Epoch %d (%d/%s):' ,global_epoch + 1, epoch + 1, args.epoch)
+        logger.info('Epoch %d (%d/%s):', global_epoch + 1, epoch + 1, args.epoch)
 
         scheduler.step()
-        for batch_id, data in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):
+        for batch_id, data in tqdm(enumerate(train_data_loader, 0), total=len(train_data_loader), smoothing=0.9):
             points, target = data
             target = target[:, 0]
             points = points.transpose(2, 1)
@@ -116,16 +118,15 @@ def main(args):
             optimizer.step()
             global_step += 1
 
-        train_acc = test(classifier.eval(), trainDataLoader) if args.train_metric else None
-        acc = test(classifier, testDataLoader)
-
+        train_acc = test(classifier.eval(), train_data_loader) if args.train_metric else None
+        acc = test(classifier, test_data_loader)
 
         print('\r Loss: %f' % loss.data)
         logger.info('Loss: %.2f', loss.data)
         if args.train_metric:
             print('Train Accuracy: %f' % train_acc)
-            logger.info('Train Accuracy: %f', (train_acc))
-        print('\r Test %s: %f   ***  %s: %f' % (blue('Accuracy'),acc, blue('Best Accuracy'),best_tst_accuracy))
+            logger.info('Train Accuracy: %f', train_acc)
+        print('\r Test %s: %f   ***  %s: %f' % (blue('Accuracy'), acc, blue('Best Accuracy'), best_tst_accuracy))
         logger.info('Test Accuracy: %f  *** Best Test Accuracy: %f', acc, best_tst_accuracy)
 
         if (acc >= best_tst_accuracy) and epoch > 5:
@@ -141,9 +142,10 @@ def main(args):
                 args.model_name)
             print('Saving model....')
         global_epoch += 1
-    print('Best Accuracy: %f'%best_tst_accuracy)
+    print('Best Accuracy: %f' % best_tst_accuracy)
 
     logger.info('End of training...')
+
 
 if __name__ == '__main__':
     args = parse_args()
